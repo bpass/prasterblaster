@@ -31,20 +31,23 @@ int main(int argc, char *argv[])
 	vector<unsigned char> *dat = 0;
 	PRProcess prc(MPI_COMM_WORLD);
 	Reprojector *re = 0;
+	string output_filename = "/home/dmattli/Desktop/test/test.tif";
 
 	prc.init(argc, argv);
 
 	rows = cols = 0;
+//	ProjectedRaster in("/home/dmattli/Desktop/mmr/glc_geographic_30sec.img");
+	ProjectedRaster in("/home/dmattli/Desktop/mmr/veg_geographic_1deg.img");
+	if (in.isReady() == true) {
+	  printf("Image opened!\n");
+	} else {
+	  prc.abort();
+	  return 1;
+	}
 	
-	if (prc.isMaster()) {
-		ProjectedRaster in("/home/dmattli/Desktop/mmr/veg_geographic_1deg.img");
-		//	ProjectedRaster in("/home/dmattli/Desktop/example.tif");
-		if (in.isReady() == true) {
-			printf("Image opened!\n");
-		}
-
-		Projection *outproj;
-		outproj = new Mollweide(params, METER, in.getDatum());
+	Projection *outproj;
+	outproj = new Mollweide(params, METER, in.getDatum());
+	
 		/*
 		  FindMinBox(&in, outproj, in.bitsPerPixel(), ul_x, ul_y, lr_x, lr_y);
 		  FindMinBox(&in, outproj, in.bitsPerPixel(), ul_x, ul_y, lr_x, lr_y);
@@ -57,30 +60,28 @@ int main(int argc, char *argv[])
 		  in.getPixelType(), in.getPixelSize(), 
 		  in.bandCount(), outproj, ul_x, ul_y);
 		*/
-		ProjectedRaster out("/home/dmattli/Desktop/test/test.tif",
+	if (!prc.isMaster()) {
+		output_filename = "";
+	}
+		ProjectedRaster out(output_filename,
 				    &in,
 				    outproj,
 				    in.getPixelType(),
 				    in.getPixelSize());
 
-
 	
-		if (!(in.isReady() && out.isReady())) {
-			printf("Error in opening rasters\n");
-			return 1;
-		}
-	
-		re = new Reprojector(prc, &in, &out);
-		re->parallelReproject();
-
-		// Cleanup
-		delete re;
-		delete outproj;	
-	} else { // Non-master
-		re = new Reprojector(prc, 0, 0);
-		re->parallelReproject();
-		delete re;
+	if (!(in.isReady() && out.isReady())) {
+		printf("Error in opening rasters\n");
+		return 1;
 	}
+	
+	re = new Reprojector(prc, &in, &out);
+	printf("Beginnning reprojection...\n");
+//	re->parallelReproject();
+	
+	// Cleanup
+	//		delete re;
+	//		delete outproj;	
 
 	return 0;
 }

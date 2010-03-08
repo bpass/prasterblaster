@@ -261,7 +261,9 @@ initMem(const SpaceDims& dims) {
   }
   else {
     _dims = dims;
+    printf("Making vector of size: %d\n", dims.size());
     _matrix = new elemType[dims.size()];
+    printf("Vector done!\n");
     if(!_matrix) {
       cerr << __FILE__ << " " << __FUNCTION__ \
            << " Error: unable to allocate memory for the CellSpace" \

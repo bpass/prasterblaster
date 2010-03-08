@@ -2,7 +2,7 @@ SUBDIRS = pRPL gctp_cpp
 
 bin_PROGRAMS = prasterblaster
 prasterblaster_LDFLAGS = $(all_libraries) -LpRPL -Lgctp_cpp
-prasterblaster_LDADD = -lprp -lgctp_cpp
+prasterblaster_LDADD = -lprp -lgctp_cpp -lmpi
 prasterblaster_SOURCES =  projectedraster.cpp \
                  rasterinfo.cpp \
 	         reprojector.cpp \

@@ -708,6 +708,7 @@ dstrbtCellSpace(bool dstrbtData) {
     MPI_Abort(comm, -1);
     return false;
   }
+
   SubSpaceMap &prcInfoMap = *(_pPRPrc->prcInfoMap());
   const vector<SubSpaceInfo *> &lclSubInfos = _pPRPrc->lclSubInfos();
   int nTotalNbrs = 0;
@@ -719,7 +720,6 @@ dstrbtCellSpace(bool dstrbtData) {
   _vInfoReqs.resize(2 * nTotalNbrs);
   _vUpdtReqs.resize(2 * nTotalNbrs);
   int nSubSpcs = _vpSubSpcs.size();
-  
   vector<MPI_Request> vRequests;
   vector<MPI_Status> vStatus;
 
@@ -727,7 +727,6 @@ dstrbtCellSpace(bool dstrbtData) {
     if(!dstrbtData) {
       return true;
     }
-
     if(!hasCellSpace()) {
       MPI_Abort(comm, -1);
       return false;
@@ -743,6 +742,7 @@ dstrbtCellSpace(bool dstrbtData) {
 
     for(int iPrc = 0; iPrc < nPrcs; iPrc++) {
       const vector<SubSpaceInfo *> &vpInfos = prcInfoMap[iPrc];
+      printf("Infos size: %d\n", vpInfos.size());
       for(int iSub = 0; iSub < vpInfos.size(); iSub++) {
         SubSpaceInfo &subInfo = *(vpInfos[iSub]);
         if(cellSpace.dims() != subInfo.glbDims()) {
@@ -905,6 +905,7 @@ smplDcmpDstrbt(DomDcmpMethod dcmpMethod,
       _pPRPrc->abort();
       return false;
   }
+
   if(!dstrbtCellSpace(dstrbtData)) {
     cerr << __FILE__ << " " << __FUNCTION__ \
          << " Error: failed to distribute the SubSpaces onto process[" \

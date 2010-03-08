@@ -42,6 +42,7 @@ ProjectedRaster::ProjectedRaster(string _filename)
 	dataset = 0;
 	data = 0;
 	rows = cols = -1;
+	finish = true;
 
 	GDALAllRegister();
 
@@ -130,6 +131,7 @@ ProjectedRaster::ProjectedRaster(string _filename,
 	cols = num_cols;
 	pixel_size = _pixel_size;
 	type = pixel_type;
+	finish = true;
 
 	GDALAllRegister();
 
@@ -144,10 +146,11 @@ ProjectedRaster::ProjectedRaster(string _filename,
 	  
 	// Set options
 	options = CSLSetNameValue( options, "INTERLEAVE", "PIXEL" );
-	options = CSLSetNameValue( options, "BIGTIFF", "YES" );
+	//	options = CSLSetNameValue( options, "BIGTIFF", "YES" );
 	options = CSLSetNameValue( options, "TILED", "YES" );
 	options = CSLSetNameValue( options, "COMPRESS", "NONE" );
 	options = CSLSetNameValue( options, "PHOTOMETRIC", "MINISBLACK");
+
 
 	dataset = driver->Create(filename.c_str(), num_cols, num_rows, 
 				 band_count, pixel_type,
@@ -222,6 +225,7 @@ ProjectedRaster::ProjectedRaster(string _filename,
 	cols = -1;
 	pixel_size = _pixel_size;
 	type = pixel_type;
+	finish = true;
 
 	FindMinBox(input, output_proj, pixel_size, ul_x, ul_y, lr_x, lr_y);
 	rows = (ul_y-lr_y) / input->getPixelSize();
@@ -235,63 +239,65 @@ ProjectedRaster::ProjectedRaster(string _filename,
 		ready = false;
 		return;
 	}
-	  
-	// Set options
-	options = CSLSetNameValue( options, "INTERLEAVE", "PIXEL" );
-	options = CSLSetNameValue( options, "BIGTIFF", "YES" );
-	options = CSLSetNameValue( options, "TILED", "YES" );
-	options = CSLSetNameValue( options, "COMPRESS", "NONE" );
-//	options = CSLSetNameValue( options, "PHOTOMETRIC", "MINISBLACK");
+	
+	if (filename != "") {
+		// Set options
+		options = CSLSetNameValue( options, "INTERLEAVE", "PIXEL" );
+		//	options = CSLSetNameValue( options, "BIGTIFF", "YES" );
+		options = CSLSetNameValue( options, "TILED", "YES" );
+		options = CSLSetNameValue( options, "COMPRESS", "NONE" );
+		//	options = CSLSetNameValue( options, "PHOTOMETRIC", "MINISBLACK");
 
-	dataset = driver->Create(filename.c_str(), cols, rows,
-				 band_count, pixel_type,
-				 options);
+		dataset = driver->Create(filename.c_str(), cols, rows,
+					 band_count, pixel_type,
+					 options);
 
 	
-	if (dataset == 0 || projection == 0) {
-		ready = false;
-		return;
-	}
+		if (dataset == 0 || projection == 0) {
+			ready = false;
+			return;
+		}
 
-	dataset->SetGeoTransform(geotransform);
+		dataset->SetGeoTransform(geotransform);
 	
-	band = dataset->GetRasterBand(1);
+		band = dataset->GetRasterBand(1);
 
 
-	// Setup georeferencing
-	OGRSpatialReference srs;
-	long zone = -1;
+		// Setup georeferencing
+		OGRSpatialReference srs;
+		long zone = -1;
 
-	/*
-	if (projection->number() == _UTM) {
-		zone = (int)((UTM*)projection)->zone();
+		/*
+		  if (projection->number() == _UTM) {
+		  zone = (int)((UTM*)projection)->zone();
+		  }
+		  srs.importFromUSGS((long)projection->number(), 
+		  zone,
+		  projection->params(),
+		  (long)projection->datum());
+		  srs.Fixup();
+		  srs.exportToWkt(&wkt);
+		  printf("WKT YO: %s\n", wkt);
+		  dataset->SetProjection(wkt);
+		  CPLFree(wkt);
+		*/
+
+		srs.SetProjCS(projection->name().c_str());
+		srs.SetWellKnownGeogCS( "EPSG:4052" );
+		srs.exportToWkt(&wkt);
+		dataset->SetProjection(wkt);
+		CPLFree(wkt);
+		ready = true;
+
+		if (options != 0)
+			CSLDestroy(options);
 	}
-	srs.importFromUSGS((long)projection->number(), 
-			    zone,
-			    projection->params(),
-			   (long)projection->datum());
-	srs.Fixup();
-	srs.exportToWkt(&wkt);
-	printf("WKT YO: %s\n", wkt);
-	dataset->SetProjection(wkt);
-	CPLFree(wkt);
-	*/
-
-	srs.SetProjCS(projection->name().c_str());
-	srs.SetWellKnownGeogCS( "EPSG:4052" );
-	srs.exportToWkt(&wkt);
-	dataset->SetProjection(wkt);
-	CPLFree(wkt);
-	ready = true;
-
-	if (options != 0)
-		CSLDestroy(options);
-
 	return;
 }
 
 ProjectedRaster::~ProjectedRaster()
 {
+
 	if (data != 0) {
 		free(data);
 		data = 0;
@@ -302,7 +308,7 @@ ProjectedRaster::~ProjectedRaster()
 		projection = 0;
 	}
 
-	if (dataset != 0) {
+	if (dataset != 0 && finish) {
 		GDALClose( (GDALDatasetH) dataset);
 		dataset = 0;
 	}

@@ -104,6 +104,7 @@ This constructor takes a single arguments, filename, representing
 	GDALDataType type;
 	double pixel_size;
 	int band_count;
+	bool finish;
 
 	// File Description
 	std::string filename;
