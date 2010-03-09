@@ -33,11 +33,12 @@ public:
 
 private:
 	double maxx, minx, maxy, miny;
+	double inraster_ul_x, inraster_ul_y;
+	double begin_time, end_time;
+	int in_sub_rows, in_sub_cols;
 	ProjectedRaster *input;
 	ProjectedRaster *output;
 	PRProcess prc;
-	Layer<unsigned char> input_layer;
-	Layer<unsigned char> output_layer;
 	vector<unsigned char> inraster;
 	vector<unsigned char> outraster;
 

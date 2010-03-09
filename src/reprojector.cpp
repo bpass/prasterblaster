@@ -25,18 +25,16 @@ using namespace pRPL;
 
 Reprojector::Reprojector(PRProcess _prc, ProjectedRaster *_input, ProjectedRaster *_output) 
 	:
-	prc(_prc), input(_input), output(_output), input_layer(_prc), output_layer(_prc)
+	prc(_prc), input(_input), output(_output)
 {
 	vector<CellCoord> coords;
 	double ul_x, ul_y, lr_x, lr_y;
 	int slice_rows = output->getRowCount() / prc.nPrcs();
 	int in_beg_row = 0;
-	int in_sub_rows = 0;
-	int in_sub_cols = 0;
 
 	maxx = maxy = 0;
 	minx = miny = 1e+37;
-	resampler = &resampler::nearest_neighbor<unsigned char>;
+	//	resampler = &resampler::nearest_neighbor<unsigned char>;
 	
 	for (int i=0; i<2; ++i) {
 	  for (int j=0; j<2; ++j) {
@@ -59,38 +57,17 @@ Reprojector::Reprojector(PRProcess _prc, ProjectedRaster *_input, ProjectedRaste
 	in_sub_rows = (ul_y - lr_y) / input->getPixelSize() + 1;
 	in_sub_cols = (lr_x - ul_x) / input->getPixelSize() + 1;
 	inraster.resize(in_sub_rows * in_sub_cols);
-
+	inraster_ul_x = ul_x;
+	inraster_ul_y = ul_y;
 	in_beg_row = (input->ul_y - ul_y) / input->getPixelSize();
-	printf("Rank: %d, beginning row: %d inraster size: %d %d\n", prc.id(), in_beg_row,
-	       input->getRowCount(), in_sub_cols);
 
 	if (prc.isMaster()) {
-		// Initialize input layer
-		/*
-		input_layer.newCellSpace();
-		input_layer.cellSpace()->initMem(SpaceDims(input->getColCount()*input->bandCount()
-							   *input->bitsPerPixel()/8,
-							   input->getRowCount()*input->bandCount()
-							   *input->bitsPerPixel()/8));
-
-		// Initialize input layer with raster
-		if (!input->readRaster(0, input->getRowCount(), (*(input_layer.cellSpace()))[0])) {
-			// Problem...
-		} else {
-			printf("\nReading input raster successful...\n");
-		}
-		*/
-		// Initialize output layer
-/*
-		output_layer.newCellSpace();
-		output_layer.cellSpace()->initMem(SpaceDims(output->getColCount()*output->bandCount()
-							   *output->bitsPerPixel()/8,
-							   output->getRowCount()*output->bandCount()
-							   *output->bitsPerPixel()/8));
-		output_layer.newNbrhood(coords); 
-*/
+		outraster.resize(input->getRowCount() * input->getColCount());
 	}
 	
+	// Read input raster
+	input->readRaster(in_beg_row, in_sub_rows, &(inraster[0]));
+
 	
 
 	return;
@@ -105,27 +82,6 @@ return;
 
 void Reprojector::parallelReproject()
 {
-/*
-  if (!input_layer.broadcast()) {
-  cerr << "\nError during input broadcast!\n" << std::endl;
-  prc.abort();
-  return;
-  } else {
-  printf("\nBroadcast successful!\n");
-  }
-*/
-/*
-
-  if(!output_layer.smplDcmpDstrbt(SMPL_ROW, prc.nPrcs(), 1, false)) {
-  cerr << "\nError during output distribution! \n" << endl;
-  prc.abort();
-  return;
-
-  } else {
-  printf("\n Decomposition of output successful! \n");
-  }
-
-*/
 
 	Transformer t;
 	Coordinate temp, temp2;
@@ -133,9 +89,13 @@ void Reprojector::parallelReproject()
 	double in_pixsize, out_pixsize;
 	long in_rows, in_cols, out_rows, out_cols;
 	vector<char> ot;
+	Projection* outproj = output->getProjection();
+
+	begin_time = MPI_Wtime();
 
 	t.setInput(*output->getProjection());
 	t.setOutput(*input->getProjection());
+
   
 	in_rows = input->getRowCount();
 	in_cols = input->getColCount();
@@ -144,47 +104,84 @@ void Reprojector::parallelReproject()
 	in_pixsize = input->getPixelSize();
 	out_pixsize = input->getPixelSize();
 	in_ulx = input->ul_x;
-	in_uly = input->ul_y;
+	in_uly = inraster_ul_y;
 	out_ulx = output->ul_x;
-	out_uly = output->ul_y - (prc.id() * ((out_rows * out_pixsize)/prc.nPrcs()));
-
+	out_uly = output->ul_y - (prc.id() * ((out_rows * out_pixsize)));
 	temp.units = METER;
-	for (int y = 0; y < out_rows; ++y) {
+
+
+	for (int y = out_rows/2; y < out_rows; ++y) {
+/*
 		if (y % 100 == 0)
-			printf("Node %d On row %d of %d\n\n\n\n\n\n", prc.id(), 
+			printf("Node %d On row %d of %d\n", prc.id(), 
 			       y + (prc.id() * (output->getRowCount()/prc.nPrcs())), 
 			       output->getRowCount());
+*/
 		for (int x = 0; x < out_cols; ++x) {
 			temp.x = ((double)x * out_pixsize) + out_ulx;
-			temp.y = ((double)y * out_pixsize) - out_uly;
+			temp.y = out_uly - ((double)y * out_pixsize);
 			t.transform(&temp);
-			output->getProjection()->inverse(temp.x, temp.y);
-			output->getProjection()->forward(output->getProjection()->lon(),
-							 output->getProjection()->lat(), 
-							 &(temp2.x), &(temp2.y));
+			outproj->inverse(temp.x, temp.y);
+			outproj->forward(outproj->lon(),
+					 outproj->lat(), 
+					 &(temp2.x), &(temp2.y));
 			temp.x = ((double)x * out_pixsize) + out_ulx;	
-			temp.y = ((double)y * out_pixsize) - out_uly;
+			temp.y = out_uly - ((double)y * out_pixsize);
 
 			t.transform(&temp);
 
 			// temp now contains coords to input projection
-			temp.x -= in_ulx;
-			temp.y += in_uly;
+			temp.x -= inraster_ul_x;
+			//temp.y += inraster_ul_y;
+			temp.y = inraster_ul_y - temp.y;
 			temp.x /= in_pixsize;
 			temp.y /= out_pixsize;
 			// temp is now scaled to input raster coords, now resample!
 			//			printf("Pixsize! %f %f\n", in_pixsize, out_pixsize);
-//			printf("About to sample the point: (%f %f) to (%d %d)\n",
-//			       temp.x, temp.y, x, y);
+			//			printf("About to sample the point: (%f %f) to (%d %d)\n",
+			//			       temp.x, temp.y, x, y);
+/*
+			if (((int)temp.x < 0) || ((int)temp.x > in_sub_cols)) {
+				printf("Node %d: X out of range! %f %d\n", prc.id(),
+				       temp.x, in_sub_cols);
+				return;
+			}
 
-			resampler(&(inraster[0]), temp.x, temp.y, in_cols, 
-				  &(outraster[0]), x, y, out_cols);
+			if (((int)temp.y < 0) || ((int)temp.y > in_sub_rows)) {
+				printf("Node %d: Y out of range! %f %d\n", prc.id(),
+				       temp.y, in_sub_rows);
+				return;
+			}
+				
+*/	
+			resampler::bilinear<unsigned char>(&(inraster[0]), 
+								   temp.x, temp.y, in_cols, 
+								   &(outraster[0]), x, y, out_cols);
+
 
 
 		}
 	}
 
+	MPI_Gather(&(outraster[0]), out_rows*out_cols, MPI_BYTE, 
+		   &(outraster[0]), out_rows*out_cols, MPI_BYTE,
+		   0, prc.comm());
 
+	if (prc.isMaster()) {
+		printf("Writing output raster.\n");
+		output->writeRaster(0, output->getRowCount(), &(outraster[0]));
+	}
+	
+
+	if (outproj)
+		delete outproj;
+
+
+	end_time = MPI_Wtime();
+	if (prc.isMaster()) {
+	printf("\n\n__--^^Reprojection took a total %f seconds ^^--__\n\n", 
+	       end_time - begin_time);
+	}
 
 	return;
 }

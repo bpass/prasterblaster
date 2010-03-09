@@ -35,14 +35,25 @@ int main(int argc, char *argv[])
 
 	prc.init(argc, argv);
 
+	if (argc < 3) {
+		if (prc.isMaster())
+			printf("usage: prasterblaster <input raster path> <output raster path>\n");
+		prc.abort();
+		return(1);
+	}
+
+	
+
 	rows = cols = 0;
 //	ProjectedRaster in("/home/dmattli/Desktop/mmr/glc_geographic_30sec.img");
-	ProjectedRaster in("/home/dmattli/Desktop/mmr/veg_geographic_1deg.img");
+	ProjectedRaster in(argv[1]);
 	if (in.isReady() == true) {
-	  printf("Image opened!\n");
+		if(prc.isMaster())
+			printf("Input raster opened.\n");
 	} else {
-	  prc.abort();
-	  return 1;
+		
+		prc.abort();
+		return 1;
 	}
 	
 	Projection *outproj;
@@ -62,13 +73,15 @@ int main(int argc, char *argv[])
 		*/
 	if (!prc.isMaster()) {
 		output_filename = "";
+	} else {
+		output_filename = argv[2];
 	}
-		ProjectedRaster out(output_filename,
-				    &in,
-				    outproj,
-				    in.getPixelType(),
-				    in.getPixelSize());
-
+	ProjectedRaster out(output_filename,
+			    &in,
+			    outproj,
+			    in.getPixelType(),
+			    in.getPixelSize());
+	
 	
 	if (!(in.isReady() && out.isReady())) {
 		printf("Error in opening rasters\n");
@@ -76,9 +89,8 @@ int main(int argc, char *argv[])
 	}
 	
 	re = new Reprojector(prc, &in, &out);
-	printf("Beginnning reprojection...\n");
-//	re->parallelReproject();
-	
+	re->parallelReproject();
+
 	// Cleanup
 	//		delete re;
 	//		delete outproj;	

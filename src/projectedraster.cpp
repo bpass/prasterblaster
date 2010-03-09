@@ -228,6 +228,7 @@ ProjectedRaster::ProjectedRaster(string _filename,
 	finish = true;
 
 	FindMinBox(input, output_proj, pixel_size, ul_x, ul_y, lr_x, lr_y);
+	//	FindMinBox(input, output_proj, pixel_size, ul_x, ul_y, lr_x, lr_y);
 	rows = (ul_y-lr_y) / input->getPixelSize();
 	cols = (lr_x-ul_x) / input->getPixelSize();
 
@@ -424,7 +425,6 @@ bool ProjectedRaster::readRaster(int firstRow, int numRows, void *data)
 		// TODO: Verify parameters!
 
 		if (ifs.good()) {
-			printf("Reading from rows:  %d cols %d\n\n", rows, cols);
 			ifs.seekg(firstRow * cols);
 			ifs.read((char*)data, 
 				 numRows * cols * (GDALGetDataTypeSize(type)/8));
