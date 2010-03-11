@@ -179,7 +179,7 @@ void Reprojector::parallelReproject()
 
 	end_time = MPI_Wtime();
 	if (prc.isMaster()) {
-	printf("\n\n__--^^Reprojection took a total %f seconds ^^--__\n\n", 
+	printf("\n\n__--^^ Reprojection took a total of %f seconds ^^--__\n\n", 
 	       end_time - begin_time);
 	}
 
