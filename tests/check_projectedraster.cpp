@@ -92,10 +92,7 @@ TEST_F(ChunkTest, minbox_continuity) {
 	Area minbox; 
 
 	for (int i = 0; i < chunks.size(); ++i) {
-		minbox = chunks[i].getGeographicalMinbox();
-		printf("Chunk %d (%f,%f) to (%f,%f)\n", i, 
-		       minbox.ul.x, minbox.ul.y,
-		       minbox.lr.x, minbox.lr.y);
+
 
 	}
 
