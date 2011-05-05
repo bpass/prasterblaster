@@ -145,59 +145,62 @@ vector<ChunkExtent> Chunker::getChunksByCount(int process_count, int process_ind
 {
 	std::vector<ChunkExtent> chunks;
 	long chunk_size = dest_raster->getRowCount() / process_count;
-	Coordinate chunk_ul;
-	Area geominbox, projminbox;
+	Coordinate ul, lr;
+	shared_ptr<Projection> destination_projection, source_projection;
+
+	destination_projection = dest_raster->getProjection();
+	source_projection = source_raster->getProjection();
 
 	if (dest_raster->getRowCount() <= 0 || process_count <= 0) {
 		return chunks;
 	}
 
-	for (int i=0; i < process_count-1; ++i) {
-		chunk_ul.x = source_raster->ul_x;
-		chunk_ul.y = source_raster->ul_y - i * chunk_size * dest_raster->pixel_size;
-		geominbox = FindGeographicalExtent(dest_raster->getProjection(),
-						   chunk_ul,
+	for (int i=0; i < process_count; ++i) {
+		long sourceFirstIndex = 0;
+		long sourceLastIndex = 0;
+		long destinationFirstIndex = i*chunk_size;
+		long destinationLastIndex = (i+1)*chunk_size - 1;
+		Area geoMinbox;
+		Area sourceMinbox;
+		Area destinationMinbox;
+		
+		if (i == process_count - 1) {
+			destinationLastIndex = source_raster->getRowCount() - 1;
+			chunk_size = destinationFirstIndex - destinationLastIndex + 1;
+		}
+
+
+		ul.x = source_raster->ul_x;
+		ul.y = source_raster->ul_y - i * chunk_size * dest_raster->pixel_size;
+		geoMinbox = FindGeographicalExtent(destination_projection,
+						   ul,
 						   chunk_size,
 						   dest_raster->getColCount(),
 						   dest_raster->pixel_size);
-		clampGeoCoordinate(&geominbox.ul);
-		clampGeoCoordinate(&geominbox.lr);
-		projminbox = FindProjectedExtent(source_raster->getProjection(),
-						 geominbox,
-						 source_raster->pixel_size);
-
-		chunks.push_back(ChunkExtent(i*chunk_size,
-					     ((i+1)*chunk_size-1),
-					     geominbox,
-					     projminbox));
+		clampGeoCoordinate(&geoMinbox.ul);
+		clampGeoCoordinate(&geoMinbox.lr);
+		sourceMinbox = FindProjectedExtent(source_projection,
+						    geoMinbox,
+						    source_raster->pixel_size);
+		
+		destinationMinbox = FindProjectedExtent(destination_projection,
+						  geoMinbox,
+						  dest_raster->pixel_size);
+		sourceFirstIndex = (source_raster->ul_y - destinationMinbox.ul.y) / source_raster->pixel_size;
+		sourceLastIndex = sourceFirstIndex + (source_raster->pixel_size);
+		chunks.push_back(ChunkExtent(sourceFirstIndex,
+					     sourceLastIndex,
+					     destinationFirstIndex,
+					     destinationLastIndex,
+					     sourceMinbox,
+					     destinationMinbox,
+					     geoMinbox));
 
 		
 	}
-
-	// Last chunk includes any leftover
-	long last_row = source_raster->getRowCount() - 1;
-	chunk_ul.x = source_raster->ul_x;
-	chunk_ul.y = source_raster->ul_y - ((process_count - 1) 
-					    * chunk_size * source_raster->pixel_size);
-	long last_chunk_size = last_row - (process_count - 1) + 1;
-	geominbox = FindGeographicalExtent(source_raster->getProjection(),
-					   chunk_ul,
-					   last_chunk_size,
-					   source_raster->getColCount(),
-					   source_raster->pixel_size);
-	clampGeoCoordinate(&geominbox.ul);
-	clampGeoCoordinate(&geominbox.lr);
-	projminbox = FindProjectedExtent(source_raster->getProjection(),
-					 geominbox,
-					 dest_raster->pixel_size);
 	
-
-	chunks.push_back(ChunkExtent((process_count-1)*chunk_size, last_row, geominbox,
-				 projminbox));
 
 	return chunks;
-
-	
 }
 	
 
